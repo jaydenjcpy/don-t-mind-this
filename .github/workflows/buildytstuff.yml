@@ -230,11 +230,11 @@ jobs:
          # make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
         #  mv packages/*.deb ${{ github.workspace }}/YTHoldForSpeed.deb
 
-      - name: Build YouTubeNativeShare
-        run: |
-          cd YouTubeNativeShare
-          make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
-          mv packages/*.deb ${{ github.workspace }}/YouTubeNativeShare.deb
+     # - name: Build YouTubeNativeShare
+      #  run: |
+       #   cd YouTubeNativeShare
+        #  make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+        #  mv packages/*.deb ${{ github.workspace }}/YouTubeNativeShare.deb
 
       - name: Build DontEatMyContent
         if: ${{ inputs.demc }}
