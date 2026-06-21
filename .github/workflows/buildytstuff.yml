@@ -145,8 +145,8 @@ jobs:
       - name: Clone Gonerino
         run: git clone --quiet --depth=1 https://github.com/castdrian/Gonerino.git
 
-      - name: Clone YTHoldForSpeed
-        run: git clone --quiet --depth=1 https://github.com/joshuaseltzer/YTHoldForSpeed.git
+      # - name: Clone YTHoldForSpeed
+       # run: git clone --quiet --depth=1 https://github.com/joshuaseltzer/YTHoldForSpeed.git
 
       - name: Clone YouTubeNativeShare
         run: git clone --quiet --depth=1 https://github.com/jkhsjdhjs/youtube-native-share.git YouTubeNativeShare
@@ -224,11 +224,11 @@ jobs:
           make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
           mv packages/*.deb ${{ github.workspace }}/Gonerino.deb
 
-      - name: Build YTHoldForSpeed
-        run: |
-          cd YTHoldForSpeed
-          make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
-          mv packages/*.deb ${{ github.workspace }}/YTHoldForSpeed.deb
+    #  - name: Build YTHoldForSpeed
+    #    run: |
+      #    cd YTHoldForSpeed
+         # make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+        #  mv packages/*.deb ${{ github.workspace }}/YTHoldForSpeed.deb
 
       - name: Build YouTubeNativeShare
         run: |
