@@ -39,6 +39,18 @@ on:
         required: false
         type: boolean
 
+      ytuhd:
+        description: "Integrate YTUHD (4K/higher-resolution playback)"
+        default: true
+        required: false
+        type: boolean
+
+      ytkace_version:
+        description: "YTKACE version (used in IPA filename)"
+        default: "0.6.3"
+        required: true
+        type: string
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -119,6 +131,7 @@ jobs:
         run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouPiP.git
 
       - name: Clone YTUHD
+        if: ${{ inputs.ytuhd }}
         run: git clone --quiet --depth=1 --recurse-submodules --shallow-submodules https://github.com/PoomSmart/YTUHD.git
 
       - name: Clone Return-YouTube-Dislikes
@@ -170,6 +183,7 @@ jobs:
           mv packages/*.deb ${{ github.workspace }}/YouPiP.deb
 
       - name: Build YTUHD
+        if: ${{ inputs.ytuhd }}
         run: |
           cd YTUHD
           make libvpx
@@ -266,14 +280,14 @@ jobs:
             tweaks="$tweaks $f"
           done
 
-          cyan -i youtube.ipa -o YTKP_Cracked_YT_${{ env.YT_VERSION }}.ipa -uwef $tweaks -n "${{ inputs.display_name }}" -b ${{ inputs.bundle_id }}
+          cyan -i youtube.ipa -o YTKACE_${{ inputs.ytkace_version }}_YouTube_${{ env.YT_VERSION }}_bonus.ipa -uwef $tweaks -n "${{ inputs.display_name }}" -b ${{ inputs.bundle_id }}
 
       - name: Create a Draft Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ytliteplusextra-ipa-noytlite${{ github.run_number }}
-          name: YTKP_Cracked_YT_${{ env.YT_VERSION }} (${{ github.run_number }})
-          files: YTKP_Cracked_YT_${{ env.YT_VERSION }}.ipa
+          name: YTKACE_${{ inputs.ytkace_version }}_YouTube_${{ env.YT_VERSION }}_bonus (${{ github.run_number }})
+          files: YTKACE_${{ inputs.ytkace_version }}_YouTube_${{ env.YT_VERSION }}_bonus.ipa
           draft: true
 
       - name: Job Summary - Build Complete
