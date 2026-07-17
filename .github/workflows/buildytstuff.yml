@@ -82,7 +82,17 @@ jobs:
       - name: Get YouTube Version
         run: |
           unzip -q youtube.ipa -d ytextracted
-          echo "YT_VERSION=$(grep -A 1 '<key>CFBundleVersion</key>' ytextracted/Payload/YouTube.app/Info.plist | grep '<string>' | awk -F'[><]' '{print $3}')" >> $GITHUB_ENV
+          PLIST="ytextracted/Payload/YouTube.app/Info.plist"
+          YT_VERSION=$(plutil -extract CFBundleShortVersionString raw -o - "$PLIST")
+          if [ -z "$YT_VERSION" ]; then
+            YT_VERSION=$(plutil -extract CFBundleVersion raw -o - "$PLIST")
+          fi
+          echo "Detected YouTube version: $YT_VERSION"
+          if [ -z "$YT_VERSION" ]; then
+            echo "::error::Failed to read YouTube version from Info.plist"
+            exit 1
+          fi
+          echo "YT_VERSION=$YT_VERSION" >> $GITHUB_ENV
 
       - name: Install Dependencies
         run: brew install make ldid swiftlint meson ninja
