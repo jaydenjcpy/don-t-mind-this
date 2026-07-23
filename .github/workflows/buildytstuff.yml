@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       ipa_url:
-        description: "URL to the decrypted IPA file"
-        default: ""
+        description: "URL to the decrypted IPA (leave 'auto' to fetch the latest YTKACE release IPA)"
+        default: "auto"
         required: true
         type: string
 
@@ -69,11 +69,24 @@ jobs:
           exclude_inputs: bundle_id,display_name,demc,ytvid,volboost
 
       - name: Download and Validate IPA
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          wget "${{ inputs.ipa_url }}" --quiet --no-verbose -O youtube.ipa
+          URL="${{ inputs.ipa_url }}"
+          if [ "$URL" = "auto" ] || [ -z "$URL" ]; then
+            URL=$(gh api repos/Epic0001/YTKACE/releases/latest \
+              --jq '.assets[] | select(.name | endswith(".ipa")) | .browser_download_url' | head -n1)
+            if [ -z "$URL" ]; then
+              echo "::error::No .ipa asset on the latest YTKACE release"
+              exit 1
+            fi
+            echo "Auto-fetching IPA: $URL"
+          fi
+
+          curl -fL --retry 3 -o youtube.ipa "$URL"
+          [ -s youtube.ipa ] || { echo "::error::Downloaded IPA is empty"; exit 1; }
 
           file_type=$(file --mime-type -b youtube.ipa)
-
           if [[ "$file_type" != "application/x-ios-app" && "$file_type" != "application/zip" ]]; then
             echo "::error::Validation failed: The downloaded file is not a valid IPA. Detected type: $file_type."
             exit 1
