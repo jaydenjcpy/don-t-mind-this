@@ -46,8 +46,8 @@ on:
         type: boolean
 
       ytkace_version:
-        description: "YTKACE version (used in IPA filename)"
-        default: "0.6.3"
+        description: "YTKACE version for IPA filename ('auto' fetches latest from Epic0001/YTKACE)"
+        default: "auto"
         required: true
         type: string
 
@@ -78,6 +78,24 @@ jobs:
             echo "::error::Validation failed: The downloaded file is not a valid IPA. Detected type: $file_type."
             exit 1
           fi
+
+      - name: Resolve YTKACE Version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          INPUT="${{ env.YTKACE_VERSION }}"
+          if [ "$INPUT" = "auto" ] || [ -z "$INPUT" ]; then
+            TAG=$(gh api repos/Epic0001/YTKACE/releases/latest --jq .tag_name)
+            if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
+              echo "::error::Failed to fetch latest YTKACE release tag"
+              exit 1
+            fi
+            RESOLVED="${TAG#v}"
+          else
+            RESOLVED="$INPUT"
+          fi
+          echo "Using YTKACE version: $RESOLVED"
+          echo "YTKACE_VERSION=$RESOLVED" >> $GITHUB_ENV
 
       - name: Get YouTube Version
         run: |
@@ -290,14 +308,14 @@ jobs:
             tweaks="$tweaks $f"
           done
 
-          cyan -i youtube.ipa -o YTKACE_${{ inputs.ytkace_version }}_YouTube_${{ env.YT_VERSION }}_bonus.ipa -uwef $tweaks -n "${{ inputs.display_name }}" -b ${{ inputs.bundle_id }}
+          cyan -i youtube.ipa -o YTKACE_${{ env.YTKACE_VERSION }}_YouTube_${{ env.YT_VERSION }}_bonus.ipa -uwef $tweaks -n "${{ inputs.display_name }}" -b ${{ inputs.bundle_id }}
 
       - name: Create a Draft Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ytliteplusextra-ipa-noytlite${{ github.run_number }}
-          name: YTKACE_${{ inputs.ytkace_version }}_YouTube_${{ env.YT_VERSION }}_bonus (${{ github.run_number }})
-          files: YTKACE_${{ inputs.ytkace_version }}_YouTube_${{ env.YT_VERSION }}_bonus.ipa
+          name: YTKACE_${{ env.YTKACE_VERSION }}_YouTube_${{ env.YT_VERSION }}_bonus (${{ github.run_number }})
+          files: YTKACE_${{ env.YTKACE_VERSION }}_YouTube_${{ env.YT_VERSION }}_bonus.ipa
           draft: true
 
       - name: Job Summary - Build Complete
