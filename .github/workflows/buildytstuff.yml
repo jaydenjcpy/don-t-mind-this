@@ -352,7 +352,9 @@ jobs:
             tweaks="$tweaks $f"
           done
 
-          cyan -i youtube.ipa -o YTKACE_${{ env.YTKACE_VERSION }}_YouTube_${{ env.YT_VERSION }}_bonus.ipa -uwef $tweaks -n "${{ inputs.display_name }}" -b ${{ inputs.bundle_id }}
+          NAME="${{ inputs.display_name }}"
+          BID="${{ inputs.bundle_id }}"
+          cyan -i youtube.ipa -o YTKACE_${{ env.YTKACE_VERSION }}_YouTube_${{ env.YT_VERSION }}_bonus.ipa -uwef $tweaks -n "${NAME:-YouTube}" -b "${BID:-com.google.ios.youtube}"
 
       - name: Create a Draft Release
         uses: softprops/action-gh-release@v3
