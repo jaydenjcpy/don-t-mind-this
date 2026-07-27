@@ -1,6 +1,8 @@
 name: Build IPA
 
 on:
+  schedule:
+    - cron: "*/30 * * * *"
   workflow_dispatch:
     inputs:
       ipa_url:
@@ -56,14 +58,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check:
+    name: Check for new YTKACE release
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "Manual run — building unconditionally."
+            echo "skip=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          LATEST=$(gh api repos/Epic0001/YTKACE/releases/latest --jq .tag_name)
+          LATEST="${LATEST#v}"
+          echo "Latest YTKACE tag: $LATEST"
+          if gh api repos/${{ github.repository }}/releases --paginate --jq '.[].tag_name' | grep -q "ytkace-${LATEST}-"; then
+            echo "Already built YTKACE $LATEST — skipping."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "New YTKACE version detected: $LATEST"
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
   build:
     name: Build IPA without YTLite
+    needs: check
+    if: needs.check.outputs.skip != 'true'
     runs-on: macos-latest
     permissions:
       contents: write
 
     steps:
       - name: Hide Sensitive Inputs
+        if: github.event_name == 'workflow_dispatch'
         uses: levibostian/action-hide-sensitive-inputs@v1
         with:
           exclude_inputs: bundle_id,display_name,demc,ytvid,volboost
@@ -172,7 +203,7 @@ jobs:
         run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouPiP.git
 
       - name: Clone YTUHD
-        if: ${{ inputs.ytuhd }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.ytuhd }}
         run: git clone --quiet --depth=1 --recurse-submodules --shallow-submodules https://github.com/PoomSmart/YTUHD.git
 
       - name: Clone Return-YouTube-Dislikes
@@ -214,7 +245,7 @@ jobs:
         run: git clone --quiet --depth=1 https://github.com/PoomSmart/YTVideoErrorAlert.git
 
       - name: Clone VolumeBoostYT
-        if: ${{ inputs.volboost }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.volboost }}
         run: git clone --quiet --depth=1 https://github.com/VasirakCalgux/VolumeBoostYT.git
 
       - name: Build YouPiP
@@ -224,7 +255,7 @@ jobs:
           mv packages/*.deb ${{ github.workspace }}/YouPiP.deb
 
       - name: Build YTUHD
-        if: ${{ inputs.ytuhd }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.ytuhd }}
         run: |
           cd YTUHD
           make libvpx
@@ -307,7 +338,7 @@ jobs:
           mv packages/*.deb ${{ github.workspace }}/YTVideoErrorAlert.deb
 
       - name: Build VolumeBoostYT
-        if: ${{ inputs.volboost }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.volboost }}
         run: |
           cd VolumeBoostYT
           make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless ARCHS=arm64
@@ -326,7 +357,7 @@ jobs:
       - name: Create a Draft Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ytliteplusextra-ipa-noytlite${{ github.run_number }}
+          tag_name: ytkace-${{ env.YTKACE_VERSION }}-yt${{ env.YT_VERSION }}-${{ github.run_number }}
           name: YTKACE_${{ env.YTKACE_VERSION }}_YouTube_${{ env.YT_VERSION }}_bonus (${{ github.run_number }})
           files: YTKACE_${{ env.YTKACE_VERSION }}_YouTube_${{ env.YT_VERSION }}_bonus.ipa
           draft: true
