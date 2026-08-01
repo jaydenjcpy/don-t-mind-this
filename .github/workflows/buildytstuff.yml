@@ -1,13 +1,11 @@
 name: Build IPA
 
 on:
-  schedule:
-    - cron: "*/30 * * * *"
   workflow_dispatch:
     inputs:
       ipa_url:
-        description: "URL to the decrypted IPA (leave 'auto' to fetch the latest YTKACE release IPA)"
-        default: "auto"
+        description: "URL to the decrypted IPA (required)"
+        default: ""
         required: true
         type: string
 
@@ -48,8 +46,8 @@ on:
         type: boolean
 
       ytkace_version:
-        description: "YTKACE version for IPA filename ('auto' fetches latest from Epic0001/YTKACE)"
-        default: "auto"
+        description: "YTKACE version for IPA filename (required, e.g. 0.7.5)"
+        default: ""
         required: true
         type: string
 
@@ -58,64 +56,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Check for new YTKACE release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    outputs:
-      skip: ${{ steps.check.outputs.skip }}
-    steps:
-      - id: check
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ "${{ github.event_name }}" != "schedule" ]; then
-            echo "Manual run — building unconditionally."
-            echo "skip=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          LATEST=$(gh api repos/Epic0001/YTKACE/releases/latest --jq .tag_name)
-          LATEST="${LATEST#v}"
-          echo "Latest YTKACE tag: $LATEST"
-          if gh api repos/${{ github.repository }}/releases --paginate --jq '.[].tag_name' | grep -q "ytkace-${LATEST}-"; then
-            echo "Already built YTKACE $LATEST — skipping."
-            echo "skip=true" >> $GITHUB_OUTPUT
-          else
-            echo "New YTKACE version detected: $LATEST"
-            echo "skip=false" >> $GITHUB_OUTPUT
-          fi
-
   build:
     name: Build IPA without YTLite
-    needs: check
-    if: needs.check.outputs.skip != 'true'
     runs-on: macos-latest
     permissions:
       contents: write
 
     steps:
       - name: Hide Sensitive Inputs
-        if: github.event_name == 'workflow_dispatch'
         uses: levibostian/action-hide-sensitive-inputs@v1
         with:
           exclude_inputs: bundle_id,display_name,demc,ytvid,volboost
 
       - name: Download and Validate IPA
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           URL="${{ inputs.ipa_url }}"
-          if [ "$URL" = "auto" ] || [ -z "$URL" ]; then
-            URL=$(gh api repos/Epic0001/YTKACE/releases/latest \
-              --jq '.assets[] | select(.name | endswith(".ipa")) | .browser_download_url' | head -n1)
-            if [ -z "$URL" ]; then
-              echo "::error::No .ipa asset on the latest YTKACE release"
-              exit 1
-            fi
-            echo "Auto-fetching IPA: $URL"
+          if [ -z "$URL" ]; then
+            echo "::error::ipa_url is required"
+            exit 1
           fi
-
           curl -fL --retry 3 -o youtube.ipa "$URL"
           [ -s youtube.ipa ] || { echo "::error::Downloaded IPA is empty"; exit 1; }
 
@@ -126,22 +85,14 @@ jobs:
           fi
 
       - name: Resolve YTKACE Version
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          INPUT="${{ env.YTKACE_VERSION }}"
-          if [ "$INPUT" = "auto" ] || [ -z "$INPUT" ]; then
-            TAG=$(gh api repos/Epic0001/YTKACE/releases/latest --jq .tag_name)
-            if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
-              echo "::error::Failed to fetch latest YTKACE release tag"
-              exit 1
-            fi
-            RESOLVED="${TAG#v}"
-          else
-            RESOLVED="$INPUT"
+          INPUT="${{ inputs.ytkace_version }}"
+          if [ -z "$INPUT" ]; then
+            echo "::error::ytkace_version is required"
+            exit 1
           fi
-          echo "Using YTKACE version: $RESOLVED"
-          echo "YTKACE_VERSION=$RESOLVED" >> $GITHUB_ENV
+          echo "Using YTKACE version: $INPUT"
+          echo "YTKACE_VERSION=$INPUT" >> $GITHUB_ENV
 
       - name: Get YouTube Version
         run: |
@@ -205,7 +156,7 @@ jobs:
         run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouPiP.git
 
       - name: Clone YTUHD
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.ytuhd }}
+        if: ${{ inputs.ytuhd }}
         run: git clone --quiet --depth=1 --recurse-submodules --shallow-submodules https://github.com/PoomSmart/YTUHD.git
 
       - name: Clone Return-YouTube-Dislikes
@@ -247,7 +198,7 @@ jobs:
         run: git clone --quiet --depth=1 https://github.com/PoomSmart/YTVideoErrorAlert.git
 
       - name: Clone VolumeBoostYT
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.volboost }}
+        if: ${{ inputs.volboost }}
         run: git clone --quiet --depth=1 https://github.com/VasirakCalgux/VolumeBoostYT.git
 
       - name: Build YouPiP
@@ -257,7 +208,7 @@ jobs:
           mv packages/*.deb ${{ github.workspace }}/YouPiP.deb
 
       - name: Build YTUHD
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.ytuhd }}
+        if: ${{ inputs.ytuhd }}
         run: |
           cd YTUHD
           make libvpx
@@ -340,7 +291,7 @@ jobs:
           mv packages/*.deb ${{ github.workspace }}/YTVideoErrorAlert.deb
 
       - name: Build VolumeBoostYT
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.volboost }}
+        if: ${{ inputs.volboost }}
         run: |
           cd VolumeBoostYT
           make clean package DEBUG=0 FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless ARCHS=arm64
